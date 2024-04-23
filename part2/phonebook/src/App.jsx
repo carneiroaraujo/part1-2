@@ -1,4 +1,4 @@
-import axios from 'axios'
+import personService from "./services/persons"
 import { useEffect, useState } from 'react'
 import Filter from './components/Filter'
 import PersonListing from './components/PersonListing'
@@ -10,7 +10,7 @@ function App() {
   const [newName, setNewName] = useState("")
   const [newNumber, setNewNumber] = useState("")
   const [filter, setFilter] = useState("")
-  
+
   function handleFilterChange(event) {
     setFilter(event.target.value.toLowerCase())
   }
@@ -20,44 +20,67 @@ function App() {
   function handleNameChange(event) {
     setNewName(event.target.value)
   }
-  function submit(event) {
+  function addPerson(event) {
     event.preventDefault()
     console.log("submitted");
-    const isNameAvailable = !persons.find(person => person.name == newName)
-    if (isNameAvailable) {
-      setPersons(persons.concat({ name: newName, number:newNumber, id:persons.length+1 }))
-      setNewName('')
-      setNewNumber('')
-    } else {
-      alert(`${newName} is already added to phonebook`)
-    }
-  }
 
-  useEffect(()=>{
-    axios
-    .get("http://localhost:3001/persons")
-    .then(response=>{
-      setPersons(response.data)
-    })
+
+    const duplicate = persons.find(person => person.name == newName)
+    const isNameAvailable = !duplicate
+    // console.log(isNameAvailable);
+    if (isNameAvailable) {
+      personService
+        .create({ name: newName, number: newNumber })
+        .then(person => {
+          setPersons(persons.concat(person))
+
+        })
+    } else {
+      if (confirm(`${newName} is already added to phonebook, replace the old number with a new one?`)) {
+        personService
+          .update(duplicate.id, { ...duplicate, number: newNumber })
+          .then(updatedPerson => {
+            setPersons(persons.map(person => person.id == updatedPerson.id ? updatedPerson : person))
+          })
+      }
+
+    }
+    setNewName('')
+    setNewNumber('')
+  }
+  function removePerson(id) {
+    personService
+      .remove(id)
+      .then(person => {
+        setPersons(persons.filter(person => person.id != id))
+      })
+  }
+  useEffect(() => {
+    personService
+      .retrieveAll()
+      .then(persons => {
+        setPersons(persons)
+      })
   }, [])
 
+  console.log("render", persons.length);
 
   return (
     <div>
       <h2>Phonebook</h2>
-      <Filter value={filter} onChange={handleFilterChange}/>
+      <Filter value={filter} onChange={handleFilterChange} />
       <h2>add a new</h2>
-      <PersonForm 
-        onSubmit={submit} 
+      <PersonForm
+        onSubmit={addPerson}
         onNameChange={handleNameChange}
         onNumberChange={handleNumberChange}
 
         newNameValue={newName}
         newNumberValue={newNumber}
       />
-      
+
       <h2>Numbers</h2>
-      <PersonListing persons={persons} filter={filter} />
+      <PersonListing persons={persons} filter={filter} remove={removePerson} />
 
     </div>
   )
